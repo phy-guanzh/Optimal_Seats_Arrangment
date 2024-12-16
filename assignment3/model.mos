@@ -1,0 +1,81 @@
+model SeatingArrangement
+    uses "mmxprs"  
+
+    declarations
+        num_groups = 7  
+        num_tables  = 5  
+        group_sizes: array(1..7) of integer  
+        Z: array(1..7, 1..6) of mpvar  
+        y: array(1..7, 1..6) of mpvar  
+    end-declarations
+
+    
+    group_sizes :: [3, 4, 2, 5, 6, 4, 5]
+
+
+    forall(i in 1..num_groups, j in 1..num_tables) do
+        Z(i,j) is_binary
+        y(i,j) is_integer
+    end-do
+
+
+    Objective := sum(i in 1..num_groups) (sum(j in 1..num_tables) Z(i,j) - 1)
+
+    forall(j in 1..num_tables) do
+        sum(i in 1..num_groups) y(i,j) <= 6
+    end-do
+
+    
+    forall(i in 1..num_groups) do
+        sum(j in 1..num_tables) y(i,j) = group_sizes(i)
+    end-do
+
+
+    forall(i in 1..num_groups, j in 1..num_tables) do
+        y(i,j) <= group_sizes(i) * Z(i,j)
+    end-do
+
+
+    forall(i in 1..num_groups) do
+        sum(j in 1..num_tables) Z(i,j) <= 2
+    end-do
+    
+    forall(j in 1..num_tables-1) do
+        sum(i in 1..num_groups) y(i, j) >= sum(i in 1..num_groups) y(i, j+1)
+    end-do
+    
+    forall(i in 1..num_groups, j in 1..num_tables) do
+        2*Z(i,j) <= y(i,j)
+    end-do
+    
+
+   
+
+    
+    setparam("XPRS_ENUMDUPLPOL",3)
+
+! Alternatively: switch off MIP heuristics to avoid generation of doubles
+! setparam("XPRS_HEUREMPHASIS", 0)
+
+! Disable presolve operations that attempt to improve the efficiency by 
+! cutting off MIP solutions from the feasible region
+    setparam("XPRS_MIPDUALREDUCTIONS", 0)
+
+! Set the max. number of solutions to store (default: 10)
+    setparam("XPRS_enummaxsol", 10)
+  
+    minimize(XPRS_ENUM,Objective)
+    forall(k in 1..getparam("XPRS_enumsols")) do
+        selectsol(k)
+        writeln("Solution ", k)
+        writeln("Optimal Objective Value: ", getobjval)
+        forall(i in 1..num_groups) do
+            forall(j in 1..num_tables) do
+                if getsol(Z(i,j)) > 0.5 then
+                    writeln("Group ", i, " is assigned to Table ", j, " with ", getsol(y(i,j)), " people")
+                end-if
+            end-do
+        end-do
+    end-do
+
+end-model
